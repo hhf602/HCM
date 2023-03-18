@@ -1,0 +1,191 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Dec 18 15:17:32 2020
+
+@author: pdsu_szj
+"""
+
+
+import networkx as nx
+import pylab
+import random
+import math
+import openpyxl
+import pathlib
+import matplotlib.pyplot as plt
+import operator
+from itertools import groupby
+#path = 'email1133.txt'#此处更换数据集
+path = 'TEST.txt'
+#path = 'text.txt'
+name = 'TEST.xlsx'
+#def simjkd( u, v):        
+ #   set_v = set( G.neighbors(v))
+  #  set_v.add(v)
+   # set_u = set( G.neighbors(u))
+    #set_u.add(u)
+    #jac = len(set_v & set_u) * 1.0 / len(set_v | set_u) #杰肯德相似系数
+#    jac = (len(set_v & set_u)-2) * 1.0 /( len(set_v | set_u)-2 )邻里重复度
+#    jac =1/(1+ abs(len(set_v)-len(set_u)))欧氏距离-衡量相似度
+#    jac = len(set_v)*len(set_u)/(pow(len(set_v),2)+ pow(len(set_u),2)-len(set_v)*len(set_u))
+#    广义Jaccard相似度，
+#    return jac
+    
+G = nx.Graph()
+with open(path) as file:
+    for line in file:
+        head, tail = [int(x) for x in line.split()]
+        G.add_edge(head, tail)
+nums = G.number_of_nodes() # 节点 数
+print('总节点数',nums)
+G.remove_edges_from(nx.selfloop_edges(G))
+edgs=G.number_of_edges()
+print('总边数',edgs)
+print('总节点数',nums)
+A=edgs*2/(nums*(nums-1))
+print('图密度',A)
+print('总边数',edgs)
+print('总节点数',nums)
+k_shell=nx.core_number(G)
+def calculation_shortest_path():#计算并将结构存储在excel中
+    i = 0
+    for node in G.nodes():
+        print("{node}节点写入xlsx,已经计算了{num}".format(node=node,num=i))
+        dict = {}
+        for otherNode in G.nodes:
+            if node == otherNode:
+                continue
+            try:
+                distance = nx.shortest_path_length(G, node, otherNode)  # 距离
+                r =distance
+                if r not in dict.keys():
+                    dict[r] = []
+                dict[r].append(otherNode)
+            except:
+                print("{node}和{otherNode}没有边".format(node=node,otherNode=otherNode))
+        for index in dict.keys():
+            ws.cell(node+1,index).value = str(dict[index]).replace("[",'').replace("]",'').replace(' ','')
+        i = i + 1
+    wb.save(name)#保存格式为node为行  列为对应最短距离的节点集合
+#打开excel文件没有则创建
+if  pathlib.Path(name).exists():#判断excel存在不存在
+    wb = openpyxl.load_workbook(name)
+    ws = wb.active
+else:
+    wb = openpyxl.Workbook()
+    wb.save("./"+name)
+    ws = wb.active
+    calculation_shortest_path()
+
+   
+    #node节点
+    #r阶跳
+def get_shortest_path(node,r):#从excel中拿出对应的r阶跳
+    value =  ws.cell(node+1,r).value
+    if value!= None :
+        return  set(map(int,str(value).lstrip(',').rstrip(',').split(",")))
+    return value
+
+def get_all_shortest_path(node,r):
+    setu = set()
+    while r>=1:
+        value = get_shortest_path(node+1,r)
+        if value != None :
+           setu = setu | value
+        r= r - 1
+    return setu
+ec = nx.eigenvector_centrality(G, max_iter=5000)
+print('ec',ec)
+maxEc=max(ec.values())#通过max()函数找到字典k_shell中的value最大值。
+minEc=min(ec.values())
+z=maxEc-minEc
+#bc = nx.betweenness_centrality(G)
+#cc = nx.closeness_centrality(G)
+def calculation_Q (node):
+    k2=ec[node]
+#    k=bc[node]
+    r = 1
+    nodes = get_shortest_path(node,r)#第r阶跳
+#    set_i=set()
+#    set_i.add(node)
+    sums = 0;
+    while nodes != None :
+        lists = []
+#        set_i = set_i | nodes #节点r跳以内节点
+        for otherNode in list(nodes):
+#            if k2<ec[otherNode] :
+#                continue
+#            else:
+##                distances = nx.shortest_path_length(G,source=node,target=otherNode)
+#                set_i =   get_all_shortest_path(node,r)#节点r跳以内节点
+#                set_i.add(node)
+#                set_j =   get_all_shortest_path(otherNode,r)
+#        
+#                set_j.add(otherNode)
+#                set_1i =   nodes#节点的r跳
+#                set_1j =   get_shortest_path(otherNode,r)
+#                T=G.degree(node)-G.degree(otherNode)
+#                T1= ec[node]*math.exp(G.degree(node)-G.degree(otherNode))
+                k3=k2-ec[otherNode]
+                T1= (G.degree(node))*math.exp(k3)
+                print('节点，T1',otherNode,T1)
+#                k=bc[node]
+#                k1=cc[node]
+#                k2=ec[node]
+#                k3=(len(set_i)-len(set_1j))/r
+#                k4=(len(set_i)-len(set_1j))/(3.1415926*r*r)
+                k5=G.degree(otherNode)/(3.1415926**r)
+                print('节点，k5',otherNode,k5)
+#                A = len(nodes & set_1j)/len(nodes | set_1j)
+#                A= (2277/1870)*1.0
+#                Q = k1*A*T1/r
+                Q = k5*A*T1/r
+                print('节点，Q',otherNode,Q)
+                lists.append(Q)
+        sums = sums + sum(lists)*1.0
+        r = r + 1
+        nodes = get_shortest_path(node,r)#获取下一个单元格
+    return sums
+#print(calculation_Q(2))
+def algorithm1():
+    dicts = {}
+    i = 0
+    for node in G.nodes():
+        print("{node}节点正在计算,已经计算了{num}".format(node=node,num=i))
+        dicts[node] = calculation_Q(node)
+        i = i+1
+    return dicts
+#algorithm1()
+#
+res = algorithm1()
+print("res=",res)
+#按照数值排序
+nodelist=[]
+sortNum = sorted(res.items(), key=lambda x: x[1], reverse=True)
+ #将结果保存到文件中
+for key in sortNum:
+    nodelist.append(key.__getitem__(0))
+print(nodelist)
+print('图密度',A)
+print('总边数',edgs)
+print('总节点数',nums)
+f =open('outputdata\\rcd-8_'+path, "w+")
+for key,val in sortNum:
+   f.write(str(key)+'\t'+str(val)+"\n")   
+
+f.close()
+
+#按照节点编号排序
+nodelist1=[]
+sortNum1 = sorted(res.items(), key=lambda x: x[0], reverse=False)
+ #将结果保存到文件中
+for key in sortNum1:
+    nodelist1.append(key.__getitem__(0))
+print(nodelist1)
+
+f =open('outputdata\\rcd-8_1'+path, "w+")
+for key,val in sortNum1:
+   f.write(str(key)+'\t'+str(val)+"\n")   
+
+f.close()
+
